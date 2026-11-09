@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-build.py - Executive Resume Site Builder
-Parses .docx resumes into clean, human-readable, executive web documents.
-Completely eliminates horizontal overflow, ASCII border art, and cramping.
-Fully responsive on mobile, tablet, and desktop.
+build.py - Authentic & Faithful Resume Builder
+Faithfully renders the exact content, structure, and text of the 3 resumes
+with embedded Starreckon QR code, exact PDF/DOCX downloads, and responsive layout.
 """
 
 import os
 import shutil
 import re
 import html
+import subprocess
 import docx
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -24,8 +24,9 @@ RESUME_CONFIGS = [
         "title": "All Public Repos",
         "subtitle": "Consolidated Public Surface (Both Accounts)",
         "badge": "38 Repos · 170k LOC · 3,342 Tests",
-        "file": "Alexander_Sorrell_Resume_Public_All.docx",
-        "orig_file": "Alexander Sorrell Resume — Public.docx",
+        "docx_src": "Alexander Sorrell Resume — Public.docx",
+        "pdf_name": "Alexander Sorrell Resume — Public.pdf",
+        "docx_name": "Alexander Sorrell Resume — Public.docx",
         "default": True
     },
     {
@@ -33,8 +34,9 @@ RESUME_CONFIGS = [
         "title": "Alexander-Sorrell-IT",
         "subtitle": "Primary Architecture & Verification",
         "badge": "33 Repos · 156k LOC · 3,168 Tests",
-        "file": "Alexander_Sorrell_Resume_Alexander_Sorrell_IT.docx",
-        "orig_file": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).docx",
+        "docx_src": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).docx",
+        "pdf_name": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).pdf",
+        "docx_name": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).docx",
         "default": False
     },
     {
@@ -42,384 +44,311 @@ RESUME_CONFIGS = [
         "title": "matrixbuilderops",
         "subtitle": "Agent Fleets & Operational Machinery",
         "badge": "5 Repos · 13.8k LOC · 174 Tests",
-        "file": "Alexander_Sorrell_Resume_matrixbuilderops.docx",
-        "orig_file": "Alexander Sorrell Resume — Public (matrixbuilderops).docx",
+        "docx_src": "Alexander Sorrell Resume — Public (matrixbuilderops).docx",
+        "pdf_name": "Alexander Sorrell Resume — Public (matrixbuilderops).pdf",
+        "docx_name": "Alexander Sorrell Resume — Public (matrixbuilderops).docx",
         "default": False
     }
 ]
 
-def clean_text(text):
+def clean(text):
     if not text:
         return ""
-    # Strip non-breaking spaces and trim
     return text.replace("\u00a0", " ").strip()
 
-def is_border_line(line):
+def is_border(line):
     s = line.strip()
     if not s:
         return True
-    chars = set(s)
-    # If the line consists only of =, -, ─, │, spaces
-    if chars.issubset({"=", "-", "─", "│", " "}):
-        return True
-    return False
+    return set(s).issubset({"=", "-", "─", "│", " "})
 
-def parse_docx(path):
-    doc = docx.Document(path)
+def linkify(text):
+    # Linkify github.com, linkedin.com, emails, and npx
+    escaped = html.escape(text)
+    # Linkify URLs
+    escaped = re.sub(
+        r"(https?://[^\s]+)",
+        r'<a href="\1" target="_blank" rel="noopener">\1</a>',
+        escaped
+    )
+    # Linkify github.com/xxx/yyy
+    escaped = re.sub(
+        r'(?<!")(github\.com/[a-zA-Z0-9_\-\./]+)',
+        r'<a href="https://\1" target="_blank" rel="noopener">\1</a>',
+        escaped
+    )
+    # Linkify linkedin.com/in/xxx
+    escaped = re.sub(
+        r'(?<!")(linkedin\.com/in/[a-zA-Z0-9_\-]+)',
+        r'<a href="https://\1" target="_blank" rel="noopener">\1</a>',
+        escaped
+    )
+    # Linkify email
+    escaped = re.sub(
+        r'([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)',
+        r'<a href="mailto:\1">\1</a>',
+        escaped
+    )
+    return escaped
+
+def parse_docx_resume(file_path):
+    doc = docx.Document(file_path)
     
     # Skills from Table 1
     skills = []
     if len(doc.tables) > 1:
         for row in doc.tables[1].rows:
-            cat = clean_text(row.cells[0].text)
-            details = clean_text(row.cells[1].text) if len(row.cells) > 1 else ""
-            if cat and cat != "Category":
+            cat = clean(row.cells[0].text)
+            details = clean(row.cells[1].text) if len(row.cells) > 1 else ""
+            if cat and cat.lower() != "category":
                 skills.append({"category": cat, "details": details})
                 
-    raw_paras = [clean_text(p.text) for p in doc.paragraphs if clean_text(p.text)]
-    
-    # Filter out pure ASCII dividers (=== and ---)
-    paras = [p for p in raw_paras if not is_border_line(p)]
-    
-    # Group into structured sections
-    sections = {}
-    current_sec = "SUMMARY"
-    sections[current_sec] = []
-    
-    headings = [
-        "PROFESSIONAL SUMMARY",
-        "PROOF OF WORK",
-        "ARTIFICIAL INTELLIGENCE & TECHNICAL SKILLS",
-        "PROFESSIONAL EXPERIENCE",
-        "BY THE NUMBERS",
-        "PROJECTS",
-        "LIVE TERMINAL TELEMETRY",
-        "PROGRAM DIRECTORY",
-        "QR CODE TARGET ENGINE",
-        "PUBLIC INDEPENDENT VERIFICATION ENDPOINTS"
-    ]
-    
-    for p in paras:
-        matched = False
-        upper_p = p.upper()
-        for h in headings:
-            if h in upper_p and len(p) < 90 and not ("│" in p):
-                current_sec = h
-                if current_sec not in sections:
-                    sections[current_sec] = []
-                matched = True
-                break
-        if not matched:
-            sections[current_sec].append(p)
-            
-    return {
-        "skills": skills,
-        "sections": sections
-    }
+    paras = [clean(p.text) for p in doc.paragraphs if clean(p.text)]
+    return skills, paras
 
-def format_bullet_html(line):
-    clean = re.sub(r"^[•\-\*]\s*", "", line).strip()
-    # If starts with bold intro: "Title. description..." or "Title: description"
-    match = re.match(r"^([^.:]{4,50}[.:])\s*(.*)", clean)
-    if match:
-        lead, rest = match.groups()
-        return f"<li><strong class='bullet-lead'>{html.escape(lead)}</strong> <span>{html.escape(rest)}</span></li>"
-    return f"<li><span>{html.escape(clean)}</span></li>"
-
-def render_pipe_table_html(lines, title=""):
-    """
-    Parses ASCII pipe tables ('Type │ Package │ ...') into a responsive HTML table.
-    """
+def render_pipe_table(pipe_lines, title=""):
     rows = []
-    for l in lines:
-        if "│" in l:
-            cells = [clean_text(c) for c in l.split("│")]
+    for l in pipe_lines:
+        if "│" in l and not is_border(l):
+            cells = [clean(c) for c in l.split("│")]
             rows.append(cells)
             
     if not rows:
         return ""
-    
+        
     headers = rows[0]
     data_rows = rows[1:]
     
-    html_out = ["<div class='table-card'>"]
+    out = ["<div class='resume-table-wrapper'>"]
     if title:
-        html_out.append(f"<h4 class='table-card-title'>{html.escape(title)}</h4>")
-    html_out.append("<div class='table-responsive'><table class='resume-table'>")
-    html_out.append("<thead><tr>")
+        out.append(f"<h4 class='table-title'>{html.escape(title)}</h4>")
+    out.append("<div class='table-scroll'><table class='resume-data-table'>")
+    out.append("<thead><tr>")
     for h in headers:
-        html_out.append(f"<th>{html.escape(h)}</th>")
-    html_out.append("</tr></thead><tbody>")
+        out.append(f"<th>{html.escape(h)}</th>")
+    out.append("</tr></thead><tbody>")
     
     for r in data_rows:
-        # Check if row is a summary or subheader
-        is_subtotal = any(kw in "".join(r).upper() for kw in ["TOTAL", "ALL ECOSYSTEM", "AVERAGES"])
-        row_cls = "row-subtotal" if is_subtotal else ""
-        html_out.append(f"<tr class='{row_cls}'>")
+        is_highlight = any(kw in "".join(r).upper() for kw in ["TOTAL", "ALL ECOSYSTEM", "AVERAGES"])
+        row_cls = " class='highlight-row'" if is_highlight else ""
+        out.append(f"<tr{row_cls}>")
         for idx, cell in enumerate(r):
-            # Badge for pip/npx
             if idx == 0 and cell.lower() in ["pip", "npx"]:
                 badge_cls = "badge-pip" if cell.lower() == "pip" else "badge-npx"
-                html_out.append(f"<td><span class='pkg-badge {badge_cls}'>{html.escape(cell)}</span></td>")
+                out.append(f"<td><span class='pkg-pill {badge_cls}'>{html.escape(cell)}</span></td>")
             else:
-                html_out.append(f"<td>{html.escape(cell)}</td>")
-        html_out.append("</tr>")
+                out.append(f"<td>{html.escape(cell)}</td>")
+        out.append("</tr>")
         
-    html_out.append("</tbody></table></div></div>")
-    return "\n".join(html_out)
-
-def render_projects_section(lines):
-    html_out = ["<div class='resume-section projects-section'>", "<h3>Key Systems &amp; Verified Repositories</h3>"]
-    
-    intro_lines = []
-    current_proj = None
-    proj_lines = []
-    
-    for l in lines:
-        # Subheaders like "AI EVALUATION, VERIFICATION & RED-TEAMING"
-        if l.isupper() and len(l) < 70 and not ("—" in l):
-            if current_proj:
-                html_out.append(render_single_project(current_proj, proj_lines))
-                current_proj = None
-                proj_lines = []
-            html_out.append(f"<h4 class='proj-group-title'>{html.escape(l)}</h4>")
-            continue
-            
-        # Detect project headline: "name — summary"
-        if " — " in l and not l.startswith("•") and len(l.split(" — ")[0]) < 40:
-            if current_proj:
-                html_out.append(render_single_project(current_proj, proj_lines))
-            current_proj = l
-            proj_lines = []
-        else:
-            if current_proj:
-                proj_lines.append(l)
-            else:
-                intro_lines.append(l)
-                
-    if current_proj:
-        html_out.append(render_single_project(current_proj, proj_lines))
-        
-    for il in intro_lines:
-        html_out.insert(2, f"<p class='section-intro'>{html.escape(il)}</p>")
-        
-    html_out.append("</div>")
-    return "\n".join(html_out)
-
-def render_single_project(header_line, lines):
-    parts = header_line.split(" — ", 1)
-    name = parts[0].strip()
-    tagline = parts[1].strip() if len(parts) > 1 else ""
-    
-    metrics = []
-    code_info = []
-    run_info = []
-    other = []
-    
-    for l in lines:
-        if any(w in l for w in ["lines", "commits", "tests passing", "downloads"]):
-            metrics.append(l)
-        elif l.startswith("Code:"):
-            code_info.append(l.replace("Code:", "").strip())
-        elif l.startswith("Run:") or "Built on:" in l:
-            run_info.append(l)
-        else:
-            other.append(l)
-            
-    out = [f"<div class='project-card'>"]
-    out.append(f"<div class='project-header'>")
-    out.append(f"<h4 class='project-name'>{html.escape(name)}</h4>")
-    if tagline:
-        out.append(f"<p class='project-tagline'>{html.escape(tagline)}</p>")
-    out.append("</div>")
-    
-    if metrics:
-        out.append("<div class='project-metrics-pills'>")
-        for m in metrics:
-            pills = [p.strip() for p in m.split(" · ") if p.strip()]
-            for p in pills:
-                if "github.com" in p:
-                    out.append(f"<a class='metric-pill link' href='https://{p}' target='_blank' rel='noopener'>GitHub ↗</a>")
-                elif "downloads" in p:
-                    out.append(f"<span class='metric-pill dl'>{html.escape(p)}</span>")
-                elif "tests passing" in p:
-                    out.append(f"<span class='metric-pill test'>✔ {html.escape(p)}</span>")
-                else:
-                    out.append(f"<span class='metric-pill'>{html.escape(p)}</span>")
-        out.append("</div>")
-        
-    for o in other:
-        out.append(f"<p class='project-desc'>{html.escape(o)}</p>")
-        
-    if code_info:
-        for c in code_info:
-            out.append(f"<p class='project-meta'><strong>Architecture:</strong> {html.escape(c)}</p>")
-            
-    if run_info:
-        for r in run_info:
-            out.append(f"<p class='project-meta tech-stack'><strong>Tech Stack &amp; CLI:</strong> {html.escape(r)}</p>")
-            
-    out.append("</div>")
+    out.append("</tbody></table></div></div>")
     return "\n".join(out)
 
-def render_section_content(sec_name, lines):
-    if not lines:
-        return ""
+def render_resume_body(skills, paras):
+    """
+    Renders paragraphs faithfully following the exact sequence of the document.
+    """
+    html_out = []
+    i = 0
+    n = len(paras)
+    
+    while i < n:
+        p = paras[i]
         
-    # Check if lines contain pipe table
-    pipe_lines = [l for l in lines if "│" in l]
-    non_pipe_lines = [l for l in lines if not ("│" in l)]
-    
-    html_parts = []
-    
-    if non_pipe_lines:
-        # Check bullets
-        if any(l.startswith("•") or l.startswith("-") for l in non_pipe_lines):
-            html_parts.append("<ul class='resume-bullet-list'>")
-            for l in non_pipe_lines:
-                if l.startswith("•") or l.startswith("-"):
-                    html_parts.append(format_bullet_html(l))
-                else:
-                    html_parts.append(f"<p class='resume-para'>{html.escape(l)}</p>")
-            html_parts.append("</ul>")
-        else:
-            for l in non_pipe_lines:
-                if " — " in l and ("Present" in l or "202" in l or "Jan" in l or "Apr" in l):
-                    html_parts.append(f"<div class='exp-block'><h4 class='exp-header'>{html.escape(l)}</h4>")
-                elif l.startswith("curl "):
-                    html_parts.append(f"<div class='cli-command-box'><code>{html.escape(l)}</code></div>")
-                else:
-                    html_parts.append(f"<p class='resume-para'>{html.escape(l)}</p>")
-            if "exp-block" in "".join(html_parts) and not html_parts[-1].endswith("</div>"):
-                html_parts.append("</div>")
+        # Skip pure ascii border lines
+        if is_border(p):
+            i += 1
+            continue
+            
+        # Section Heading
+        if p.isupper() and len(p) < 80 and not ("│" in p) and not ("•" in p):
+            html_out.append(f"<h3 class='resume-heading'>{html.escape(p)}</h3>")
+            
+            # If this is Skills section, inject skills table right after
+            if "TECHNICAL SKILLS" in p and skills:
+                html_out.append("<div class='skills-table-wrap'><table class='skills-table'><tbody>")
+                for sk in skills:
+                    html_out.append(f"""
+                    <tr>
+                        <td class='skills-cat'>{html.escape(sk['category'])}</td>
+                        <td class='skills-val'>{linkify(sk['details'])}</td>
+                    </tr>
+                    """)
+                html_out.append("</tbody></table></div>")
+            i += 1
+            continue
+            
+        # Detect ASCII pipe table block
+        if "│" in p:
+            table_lines = [p]
+            i += 1
+            while i < n and ("│" in paras[i] or is_border(paras[i])):
+                if not is_border(paras[i]):
+                    table_lines.append(paras[i])
+                i += 1
+            html_out.append(render_pipe_table(table_lines))
+            continue
+            
+        # Detect multi-line Project Entry (with lines, commits, Code:, etc.)
+        if "\n" in p and (" — " in p or "Code:" in p or "lines" in p):
+            sublines = [clean(s) for s in p.split("\n") if clean(s)]
+            html_out.append("<div class='project-entry'>")
+            first_line = sublines[0]
+            if " — " in first_line and not first_line.startswith("•"):
+                p_parts = first_line.split(" — ", 1)
+                html_out.append(f"<p class='proj-headline'><strong class='proj-name'>{html.escape(p_parts[0])}</strong> — <span class='proj-summary'>{linkify(p_parts[1])}</span></p>")
+            else:
+                html_out.append(f"<p class='proj-headline'>{linkify(first_line)}</p>")
                 
-    if pipe_lines:
-        html_parts.append(render_pipe_table_html(pipe_lines))
-        
-    return "\n".join(html_parts)
+            for sl in sublines[1:]:
+                if sl.startswith("Code:"):
+                    html_out.append(f"<p class='proj-code-line'><strong>Code:</strong> {linkify(sl.replace('Code:', '').strip())}</p>")
+                elif sl.startswith("Run:") or "Built on:" in sl:
+                    html_out.append(f"<p class='proj-run-line'><strong>Run / Built on:</strong> {linkify(sl)}</p>")
+                else:
+                    html_out.append(f"<p class='proj-metrics-line'>{linkify(sl)}</p>")
+                    
+            html_out.append("</div>")
+            i += 1
+            continue
 
-def build_site():
+        # Bullet item
+        if p.startswith("•") or p.startswith("-"):
+            clean_b = re.sub(r"^[•\-\*]\s*", "", p)
+            match = re.match(r"^([^.:]{4,55}[.:])\s*(.*)", clean_b)
+            if match:
+                head, tail = match.groups()
+                html_out.append(f"<div class='resume-bullet'><span class='bullet-dot'>•</span><div class='bullet-content'><strong>{html.escape(head)}</strong> {linkify(tail)}</div></div>")
+            else:
+                html_out.append(f"<div class='resume-bullet'><span class='bullet-dot'>•</span><div class='bullet-content'>{linkify(clean_b)}</div></div>")
+            i += 1
+            continue
+            
+        # Experience Header (Role — Company · Location · Dates)
+        if " — " in p and ("Present" in p or "202" in p or "Jan" in p or "Apr" in p):
+            html_out.append(f"<h4 class='exp-role-title'>{html.escape(p)}</h4>")
+            i += 1
+            continue
+            
+        # CLI command
+        if p.startswith("curl ") or p.startswith("npx "):
+            html_out.append(f"<pre class='code-block'><code>{html.escape(p)}</code></pre>")
+            i += 1
+            continue
+            
+        # Standard paragraph
+        html_out.append(f"<p class='resume-p'>{linkify(p)}</p>")
+        i += 1
+        
+    return "\n".join(html_out)
+
+def build_all():
     os.makedirs(ASSETS_DIR, exist_ok=True)
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     
-    # Copy assets
-    css_src = os.path.join(ROOT, "style.css")
-    if os.path.exists(css_src):
-        shutil.copy2(css_src, os.path.join(SITE_DIR, "style.css"))
-    cname_src = os.path.join(ROOT, "CNAME")
-    if os.path.exists(cname_src):
-        shutil.copy2(cname_src, os.path.join(SITE_DIR, "CNAME"))
-    headshot_src = os.path.join(ROOT, "alexander-sorrell-headshot.jpg")
-    if os.path.exists(headshot_src):
-        shutil.copy2(headshot_src, os.path.join(ASSETS_DIR, "alexander-sorrell.jpg"))
-    bastion_logo = "/media/phantomcore/AI_DRIVE/websites/bastion-fold/src/assets/logo.svg"
-    if os.path.exists(bastion_logo):
-        shutil.copy2(bastion_logo, os.path.join(ASSETS_DIR, "logo.svg"))
+    # 1. Convert docx to exact 1:1 PDFs with LibreOffice
+    for cfg in RESUME_CONFIGS:
+        src_docx = os.path.join(ROOT, cfg["docx_src"])
+        if not os.path.exists(src_docx):
+            src_docx = os.path.join("/home/phantomcore", cfg["docx_src"])
+            
+        # Copy original docx to downloads
+        dest_docx = os.path.join(DOWNLOADS_DIR, cfg["docx_name"])
+        shutil.copy2(src_docx, dest_docx)
+        
+        # Convert to PDF
+        pdf_dest = os.path.join(DOWNLOADS_DIR, cfg["pdf_name"])
+        if not os.path.exists(pdf_dest):
+            cmd = f'libreoffice --headless --convert-to pdf "{src_docx}" --outdir "{DOWNLOADS_DIR}"'
+            subprocess.run(cmd, shell=True, check=True)
+            
+    # 2. Copy assets (CSS, CNAME, Headshot, QR Code, Logo)
+    for f in ["style.css", "CNAME"]:
+        p = os.path.join(ROOT, f)
+        if os.path.exists(p):
+            shutil.copy2(p, os.path.join(SITE_DIR, f))
+            
+    headshot = os.path.join(ROOT, "alexander-sorrell-headshot.jpg")
+    if os.path.exists(headshot):
+        shutil.copy2(headshot, os.path.join(ASSETS_DIR, "alexander-sorrell.jpg"))
+        
+    qr_png = os.path.join(ROOT, "assets/starreckon-qr.png")
+    if os.path.exists(qr_png):
+        shutil.copy2(qr_png, os.path.join(ASSETS_DIR, "starreckon-qr.png"))
+        
+    logo = "/media/phantomcore/AI_DRIVE/websites/bastion-fold/src/assets/logo.svg"
+    if os.path.exists(logo):
+        shutil.copy2(logo, os.path.join(ASSETS_DIR, "logo.svg"))
 
-    rendered_tabs = []
-    tab_nav = []
+    # 3. Parse and render resumes
+    tab_buttons = []
+    tab_panes = []
     
     for cfg in RESUME_CONFIGS:
-        docx_path = os.path.join(RESUMES_DIR, cfg["file"])
-        if not os.path.exists(docx_path):
-            docx_path = os.path.join(ROOT, cfg["orig_file"])
-            
-        shutil.copy2(docx_path, os.path.join(DOWNLOADS_DIR, cfg["file"]))
-        parsed = parse_docx(docx_path)
+        src_docx = os.path.join(ROOT, cfg["docx_src"])
+        skills, paras = parse_docx_resume(src_docx)
         
-        resume_html = []
+        rendered_body = render_resume_body(skills, paras)
+        active_cls = "active" if cfg["default"] else ""
         
-        # 1. Summary
-        sum_lines = parsed["sections"].get("SUMMARY", []) + parsed["sections"].get("PROFESSIONAL SUMMARY", [])
-        if sum_lines:
-            resume_html.append("<section class='resume-section summary-section'>")
-            resume_html.append("<h3 class='section-title'>Professional Summary</h3>")
-            for sl in sum_lines:
-                resume_html.append(f"<p class='lede-para'>{html.escape(sl)}</p>")
-            resume_html.append("</section>")
-            
-        # 2. Proof of Work
-        pow_lines = parsed["sections"].get("PROOF OF WORK", [])
-        if pow_lines:
-            resume_html.append("<section class='resume-section pow-section'>")
-            resume_html.append("<h3 class='section-title'>Proof of Work &amp; Verification</h3>")
-            resume_html.append(render_section_content("PROOF OF WORK", pow_lines))
-            resume_html.append("</section>")
-            
-        # 3. Technical Skills
-        if parsed["skills"]:
-            resume_html.append("<section class='resume-section skills-section'>")
-            resume_html.append("<h3 class='section-title'>Artificial Intelligence &amp; Technical Skills</h3>")
-            resume_html.append("<div class='skills-grid'>")
-            for sk in parsed["skills"]:
-                resume_html.append(f"""
-                <div class='skill-item'>
-                    <span class='skill-label'>{html.escape(sk['category'])}</span>
-                    <p class='skill-desc'>{html.escape(sk['details'])}</p>
-                </div>
-                """)
-            resume_html.append("</div></section>")
-            
-        # 4. Professional Experience
-        exp_lines = parsed["sections"].get("PROFESSIONAL EXPERIENCE", [])
-        if exp_lines:
-            resume_html.append("<section class='resume-section exp-section'>")
-            resume_html.append("<h3 class='section-title'>Professional Experience</h3>")
-            resume_html.append(render_section_content("PROFESSIONAL EXPERIENCE", exp_lines))
-            resume_html.append("</section>")
-            
-        # 5. By The Numbers
-        btn_key = next((k for k in parsed["sections"] if "BY THE NUMBERS" in k), None)
-        if btn_key and parsed["sections"][btn_key]:
-            resume_html.append("<section class='resume-section metrics-section'>")
-            resume_html.append("<h3 class='section-title'>Measured Repository Metrics</h3>")
-            resume_html.append(render_section_content(btn_key, parsed["sections"][btn_key]))
-            resume_html.append("</section>")
-            
-        # 6. Projects & Repositories
-        proj_key = next((k for k in parsed["sections"] if "PROJECTS" in k), None)
-        if proj_key and parsed["sections"][proj_key]:
-            resume_html.append(render_projects_section(parsed["sections"][proj_key]))
-            
-        # 7. Live Package Telemetry
-        tele_key = next((k for k in parsed["sections"] if "LIVE TERMINAL TELEMETRY" in k or "PROGRAM DIRECTORY" in k), None)
-        if tele_key and parsed["sections"][tele_key]:
-            resume_html.append("<section class='resume-section telemetry-section'>")
-            resume_html.append("<h3 class='section-title'>Package Telemetry &amp; Registry Verification</h3>")
-            resume_html.append(render_section_content(tele_key, parsed["sections"][tele_key]))
-            resume_html.append("</section>")
-
-        active_class = "active" if cfg["default"] else ""
-        
-        tab_nav.append(f"""
-        <button class="tab-button {active_class}" data-target="{cfg['id']}">
-            <span class="tab-btn-title">{cfg['title']}</span>
-            <span class="tab-btn-badge">{cfg['badge']}</span>
+        tab_buttons.append(f"""
+        <button class="resume-tab-btn {active_cls}" data-tab="{cfg['id']}">
+            <span class="btn-name">{cfg['title']}</span>
+            <span class="btn-stat">{cfg['badge']}</span>
         </button>
         """)
         
-        rendered_tabs.append(f"""
-        <article id="{cfg['id']}" class="resume-tab-pane {active_class}">
-            <div class="resume-tab-header">
-                <div>
-                    <span class="dossier-pill">{cfg['badge']}</span>
-                    <h2 class="dossier-title">{cfg['title']}</h2>
-                    <p class="dossier-subtitle">{cfg['subtitle']}</p>
+        tab_panes.append(f"""
+        <article id="{cfg['id']}" class="resume-sheet {active_cls}">
+            <!-- Resume Header Table (Matching Word Document) -->
+            <header class="resume-doc-header">
+                <div class="header-left-col">
+                    <h1 class="header-name">Alexander Sorrell</h1>
+                    <p class="header-role">AI Principal / Builder / Breaker — Verification &amp; Evaluation</p>
+                    <p class="header-contact">
+                        (817) 996-6123 · <a href="mailto:alexander.sorrell.it@gmail.com">alexander.sorrell.it@gmail.com</a><br>
+                        <a href="https://www.linkedin.com/in/alexander-sorrell-it/" target="_blank" rel="noopener">linkedin.com/in/alexander-sorrell-it</a> · 
+                        <a href="https://github.com/Alexander-Sorrell-IT" target="_blank" rel="noopener">github.com/Alexander-Sorrell-IT</a><br>
+                        Colleyville, TX (Dallas–Fort Worth) — open to remote, onsite, or relocation
+                    </p>
                 </div>
-                <div class="dossier-actions no-print">
-                    <a class="action-btn primary" href="/downloads/{cfg['file']}" download>
+                
+                <div class="header-right-col">
+                    <a class="qr-link-box" href="https://alexander-sorrell-it.github.io/starreckon/#s=30.1&amp;g=MASTERWORK&amp;a=The_Systems_Architect&amp;v=7.0%2C6.6%2C6.1%2C5.1%2C5.3&amp;ss=14264&amp;h=1290&amp;d=75&amp;k=49&amp;tok=109.4B&amp;n=Alexander+Sorrell&amp;gh=Alexander-Sorrell-IT&amp;li=alexander-sorrell-it&amp;em=alexander.sorrell.it%40gmail.com&amp;web=github.com%2FAlexander-Sorrell-IT" target="_blank" rel="noopener" title="Scan or click to view verified Starreckon audit card">
+                        <img class="resume-qr-img" src="/assets/starreckon-qr.png" alt="Starreckon Proof of Work QR Code" width="115" height="115">
+                    </a>
+                    <div class="qr-caption">
+                        <a href="https://github.com/Alexander-Sorrell-IT/starreckon" target="_blank" rel="noopener">github.com/Alexander-Sorrell-IT/starreckon</a><br>
+                        <code>npx starreckon</code><br>
+                        <strong class="audit-verdict">VERIFIED AUDIT · 30.1 MASTERWORK</strong>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Download Action Bar for This Resume -->
+            <div class="download-bar no-print">
+                <div class="download-label">
+                    <span>Active Version: <strong>{cfg['title']}</strong></span>
+                    <span class="download-badge">{cfg['badge']}</span>
+                </div>
+                <div class="download-buttons">
+                    <a class="dl-btn dl-pdf" href="/downloads/{cfg['pdf_name']}" download>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                        Download PDF
+                    </a>
+                    <a class="dl-btn dl-docx" href="/downloads/{cfg['docx_name']}" download>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Download DOCX
                     </a>
-                    <button class="action-btn secondary" onclick="window.print()">
+                    <button class="dl-btn dl-print" onclick="window.print()">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                        Print / PDF
+                        Print
                     </button>
                 </div>
             </div>
-            
-            <div class="resume-body-content">
-                {''.join(resume_html)}
+
+            <!-- Resume Content -->
+            <div class="resume-sheet-content">
+                {rendered_body}
             </div>
         </article>
         """)
@@ -429,8 +358,8 @@ def build_site():
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-    <title>Alexander Sorrell — Interactive &amp; Verifiable Resume</title>
-    <meta name="description" content="AI Principal / Builder / Breaker — Verification &amp; Evaluation. Interactive resume across 38 public repositories with verifiable telemetry and reproducible benchmarks.">
+    <title>Alexander Sorrell — Resume</title>
+    <meta name="description" content="Alexander Sorrell — AI Principal / Builder / Breaker — Verification &amp; Evaluation.">
     <link rel="canonical" href="https://www.alexander-sorrell-it-resume.dev/">
     <meta property="og:title" content="Alexander Sorrell — Resume">
     <meta property="og:description" content="Models propose. A deterministic function owns the verdict. Every decision ships with a receipt a stranger can re-check.">
@@ -441,17 +370,17 @@ def build_site():
 </head>
 <body>
 
-    <!-- Header bar -->
-    <header class="site-header no-print">
-        <div class="page-wrap header-inner">
-            <a class="brand-link" href="https://bastionfold.com" target="_blank" rel="noopener">
-                <img src="/assets/logo.svg" alt="Bastion Fold" width="26" height="26">
+    <!-- Top Navigation Bar -->
+    <header class="top-nav-bar no-print">
+        <div class="site-container nav-inner">
+            <a class="nav-brand" href="https://bastionfold.com" target="_blank" rel="noopener">
+                <img src="/assets/logo.svg" alt="Bastion Fold Logo" width="24" height="24">
                 <span>Bastion<strong>Fold</strong></span>
             </a>
-            <div class="header-domain-pill">
+            <div class="nav-domain-label">
                 <span>www.alexander-sorrell-it-resume.dev</span>
             </div>
-            <nav class="header-nav">
+            <nav class="nav-links">
                 <a href="https://bastionfold.com/get-to-know-us/" target="_blank" rel="noopener">About Me</a>
                 <a href="https://www.linkedin.com/in/alexander-sorrell-it/" target="_blank" rel="noopener">LinkedIn</a>
                 <a href="https://github.com/Alexander-Sorrell-IT" target="_blank" rel="noopener">GitHub</a>
@@ -459,99 +388,63 @@ def build_site():
         </div>
     </header>
 
-    <main class="page-wrap main-content">
-        <!-- Profile Executive Card -->
-        <section class="profile-hero">
-            <div class="profile-photo-container">
-                <img class="profile-avatar" src="/assets/alexander-sorrell.jpg" alt="Alexander Sorrell" width="150" height="200">
+    <main class="site-container main-wrapper">
+        <!-- Resume Tabs Selector -->
+        <nav class="tabs-header-nav no-print">
+            <div class="tabs-label">Select Tailored Resume Version:</div>
+            <div class="tabs-buttons-row">
+                {''.join(tab_buttons)}
             </div>
-            <div class="profile-details">
-                <div class="profile-badges">
-                    <span class="badge-status">AVAILABLE FOR ROLES</span>
-                    <span class="badge-audit">★ 30.1 MASTERWORK · SYSTEMS ARCHITECT</span>
-                </div>
-                <h1 class="profile-title">Alexander Sorrell</h1>
-                <p class="profile-subtitle">AI Principal / Builder / Breaker — Verification &amp; Evaluation</p>
-                <blockquote class="profile-quote">
-                    <strong>Central Thesis:</strong> Models propose. A deterministic function owns the verdict. Every decision ships with a receipt a stranger can re-check — a rule ID, a cryptographic hash chain, or the OS kernel itself.
-                </blockquote>
-                <div class="profile-contact-bar no-print">
-                    <a class="contact-btn" href="https://www.linkedin.com/in/alexander-sorrell-it/" target="_blank" rel="noopener">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
-                        LinkedIn
-                    </a>
-                    <a class="contact-btn" href="https://github.com/Alexander-Sorrell-IT" target="_blank" rel="noopener">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
-                        Alexander-Sorrell-IT
-                    </a>
-                    <a class="contact-btn" href="https://github.com/matrixbuilderops" target="_blank" rel="noopener">
-                        matrixbuilderops
-                    </a>
-                    <a class="contact-btn" href="mailto:alexander.sorrell.it@gmail.com">
-                        ✉ alexander.sorrell.it@gmail.com
-                    </a>
-                    <span class="contact-text">✆ (817) 996-6123</span>
-                    <span class="contact-text">📍 Colleyville, TX</span>
-                </div>
-            </div>
-        </section>
+        </nav>
 
-        <!-- Tailored Dossiers Tabs -->
-        <section class="tab-bar-section no-print">
-            <div class="tab-bar-title">Select Resume Focus:</div>
-            <div class="tab-bar-grid">
-                {''.join(tab_nav)}
-            </div>
-        </section>
-
-        <!-- Resume Panes -->
-        <section class="resume-panes-wrapper">
-            {''.join(rendered_tabs)}
+        <!-- Resume Documents (One per tab) -->
+        <section class="resume-sheets-container">
+            {''.join(tab_panes)}
         </section>
     </main>
 
     <footer class="site-footer no-print">
-        <div class="page-wrap footer-inner">
+        <div class="site-container footer-inner">
             <p>Bastion Fold LLC · SignalCore Inc · Sovereign local verification.</p>
             <p><a href="https://bastionfold.com" target="_blank">Bastion Fold Main Website</a> · <a href="https://github.com/Alexander-Sorrell-IT/starreckon" target="_blank">Starreckon Audit Card</a></p>
         </div>
     </footer>
 
     <script>
-        const buttons = document.querySelectorAll('.tab-button');
-        const panes = document.querySelectorAll('.resume-tab-pane');
+        const tabBtns = document.querySelectorAll('.resume-tab-btn');
+        const sheets = document.querySelectorAll('.resume-sheet');
 
-        function activateTab(targetId) {{
-            buttons.forEach(b => {{
-                if (b.dataset.target === targetId) {{
-                    b.classList.add('active');
+        function selectTab(tabId) {{
+            tabBtns.forEach(btn => {{
+                if (btn.dataset.tab === tabId) {{
+                    btn.classList.add('active');
                 }} else {{
-                    b.classList.remove('active');
+                    btn.classList.remove('active');
                 }}
             }});
 
-            panes.forEach(p => {{
-                if (p.id === targetId) {{
-                    p.classList.add('active');
+            sheets.forEach(sheet => {{
+                if (sheet.id === tabId) {{
+                    sheet.classList.add('active');
                 }} else {{
-                    p.classList.remove('active');
+                    sheet.classList.remove('active');
                 }}
             }});
 
             if (history.replaceState) {{
-                history.replaceState(null, null, '#' + targetId);
+                history.replaceState(null, null, '#' + tabId);
             }}
         }}
 
-        buttons.forEach(b => {{
-            b.addEventListener('click', () => {{
-                activateTab(b.dataset.target);
+        tabBtns.forEach(btn => {{
+            btn.addEventListener('click', () => {{
+                selectTab(btn.dataset.tab);
             }});
         }});
 
-        const hash = window.location.hash.replace('#', '');
-        if (hash && document.getElementById(hash)) {{
-            activateTab(hash);
+        const initialHash = window.location.hash.replace('#', '');
+        if (initialHash && document.getElementById(initialHash)) {{
+            selectTab(initialHash);
         }}
     </script>
 </body>
@@ -560,7 +453,7 @@ def build_site():
     with open(os.path.join(SITE_DIR, "index.html"), "w", encoding="utf-8") as f:
         f.write(index_html)
         
-    print(f"[build] Built executive site with {len(RESUME_CONFIGS)} tabs into {SITE_DIR}")
+    print(f"[build] Rendered authentic resumes into {SITE_DIR}")
 
 if __name__ == "__main__":
-    build_site()
+    build_all()
