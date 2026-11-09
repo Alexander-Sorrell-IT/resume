@@ -1,0 +1,39 @@
+name: Build and deploy Resume to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install python-docx pillow
+
+      - name: Build resume static site
+        run: python build.py
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy _site --project-name=resume --branch=main
+
+      - name: Notify Bastion Fold website to rebuild
+        run: |
+          curl -s -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${{ secrets.BASTION_DISPATCH_TOKEN || secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/BastionFold/website/dispatches \
+            -d '{"event_type": "product-updated"}' || true
