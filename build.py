@@ -44,15 +44,6 @@ RESUME_CONFIGS = [
         "file": "Alexander_Sorrell_Resume_matrixbuilderops.docx",
         "orig_file": "Alexander Sorrell Resume — Public (matrixbuilderops).docx",
         "default": False
-    },
-    {
-        "id": "all-repos",
-        "title": "All Repositories (Master)",
-        "subtitle": "Complete Verifiable Dossier (Public + Private)",
-        "badge": "119 Repos · 786k LOC · 6,150 Tests",
-        "file": "Alexander_Sorrell_Resume_All_Repos.docx",
-        "orig_file": "Alexander Sorrell Resume — All Repos.docx",
-        "default": False
     }
 ]
 
