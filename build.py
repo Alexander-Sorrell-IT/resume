@@ -155,10 +155,13 @@ def build_site():
     os.makedirs(ASSETS_DIR, exist_ok=True)
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
     
-    # Copy style.css
+    # Copy style.css and CNAME
     css_src = os.path.join(ROOT, "style.css")
     if os.path.exists(css_src):
         shutil.copy2(css_src, os.path.join(SITE_DIR, "style.css"))
+    cname_src = os.path.join(ROOT, "CNAME")
+    if os.path.exists(cname_src):
+        shutil.copy2(cname_src, os.path.join(SITE_DIR, "CNAME"))
     
     # Copy headshot and logo if present
     headshot_src = os.path.join(ROOT, "alexander-sorrell-headshot.jpg")
@@ -270,8 +273,10 @@ def build_site():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Alexander Sorrell — Interactive & Verifiable Resume</title>
     <meta name="description" content="AI Principal / Builder / Breaker — Verification & Evaluation. Interactive resume with verifiable telemetry, reproducible benchmarks, and ATS-clean export.">
+    <link rel="canonical" href="https://www.alexander-sorrell-it-resume.dev/">
     <meta property="og:title" content="Alexander Sorrell — Resume">
     <meta property="og:description" content="Models propose. A deterministic function owns the verdict. Every decision ships with a receipt a stranger can re-check.">
+    <meta property="og:url" content="https://www.alexander-sorrell-it-resume.dev/">
     <meta property="og:type" content="website">
     <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
     <link rel="stylesheet" href="/style.css">
@@ -285,10 +290,13 @@ def build_site():
                 <img src="/assets/logo.svg" alt="Bastion Fold Logo" width="28" height="28">
                 <span>Bastion<strong>Fold</strong></span>
             </a>
+            <div class="header-domain-badge">
+                <span>www.alexander-sorrell-it-resume.dev</span>
+            </div>
             <div class="header-links">
+                <a href="https://bastionfold.com/get-to-know-us/" target="_blank" rel="noopener">About Me (Bastion Fold)</a>
                 <a href="https://www.linkedin.com/in/alexander-sorrell-it/" target="_blank" rel="noopener">LinkedIn</a>
                 <a href="https://github.com/Alexander-Sorrell-IT" target="_blank" rel="noopener">GitHub</a>
-                <a href="https://github.com/BastionFold/resume" target="_blank" rel="noopener">Resume Repo</a>
             </div>
         </div>
     </header>

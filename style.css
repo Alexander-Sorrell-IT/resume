@@ -68,6 +68,15 @@ a:hover { text-decoration: underline; }
 }
 .brand strong { color: var(--accent); }
 .brand:hover { text-decoration: none; }
+.header-domain-badge {
+  font-size: 0.78rem;
+  font-family: var(--mono);
+  color: var(--accent);
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
 .header-links { display: flex; gap: 20px; font-size: 0.9rem; }
 .header-links a { color: var(--ink-soft); }
 .header-links a:hover { color: var(--ink); text-decoration: none; }
