@@ -23,7 +23,6 @@ When you update or add any `.docx` file in `resumes/` and push to `main`:
 1. The GitHub Action runs `python build.py`.
 2. Re-parses all `.docx` files into clean, ATS-compliant HTML with tabbed navigation.
 3. Deploys live to Cloudflare Pages.
-4. Triggers an automatic rebuild of the main Bastion Fold company site via `repository_dispatch`.
 
 ## Local Preview
 

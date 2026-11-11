@@ -275,9 +275,10 @@ def build_all():
     if os.path.exists(qr_png):
         shutil.copy2(qr_png, os.path.join(ASSETS_DIR, "starreckon-qr.png"))
         
-    logo = "/media/phantomcore/AI_DRIVE/websites/bastion-fold/src/assets/logo.svg"
-    if os.path.exists(logo):
-        shutil.copy2(logo, os.path.join(ASSETS_DIR, "logo.svg"))
+    fav = os.path.join(ROOT, "assets/favicon.svg")
+    if os.path.exists(fav):
+        shutil.copy2(fav, os.path.join(ASSETS_DIR, "favicon.svg"))
+        shutil.copy2(fav, os.path.join(ASSETS_DIR, "logo.svg"))
 
     # 3. Parse and render resumes
     tab_buttons = []
@@ -365,7 +366,7 @@ def build_all():
     <meta property="og:description" content="Models propose. A deterministic function owns the verdict. Every decision ships with a receipt a stranger can re-check.">
     <meta property="og:url" content="https://www.alexander-sorrell-it-resume.dev/">
     <meta property="og:type" content="website">
-    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+    <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -373,17 +374,17 @@ def build_all():
     <!-- Top Navigation Bar -->
     <header class="top-nav-bar no-print">
         <div class="site-container nav-inner">
-            <a class="nav-brand" href="https://bastionfold.com" target="_blank" rel="noopener">
-                <img src="/assets/logo.svg" alt="Bastion Fold Logo" width="24" height="24">
-                <span>Bastion<strong>Fold</strong></span>
+            <a class="nav-brand" href="/">
+                <img src="/assets/favicon.svg" alt="Alexander Sorrell" width="24" height="24">
+                <span>Alexander<strong>Sorrell</strong></span>
             </a>
             <div class="nav-domain-label">
                 <span>www.alexander-sorrell-it-resume.dev</span>
             </div>
             <nav class="nav-links">
-                <a href="https://bastionfold.com/get-to-know-us/" target="_blank" rel="noopener">About Me</a>
                 <a href="https://www.linkedin.com/in/alexander-sorrell-it/" target="_blank" rel="noopener">LinkedIn</a>
                 <a href="https://github.com/Alexander-Sorrell-IT" target="_blank" rel="noopener">GitHub</a>
+                <a href="mailto:alexander.sorrell.it@gmail.com">Contact</a>
             </nav>
         </div>
     </header>
@@ -405,8 +406,8 @@ def build_all():
 
     <footer class="site-footer no-print">
         <div class="site-container footer-inner">
-            <p>Bastion Fold LLC · SignalCore Inc · Sovereign local verification.</p>
-            <p><a href="https://bastionfold.com" target="_blank">Bastion Fold Main Website</a> · <a href="https://github.com/Alexander-Sorrell-IT/starreckon" target="_blank">Starreckon Audit Card</a></p>
+            <p>Alexander Sorrell · Sovereign Local Verification &amp; Deterministic Evaluation</p>
+            <p><a href="https://github.com/Alexander-Sorrell-IT" target="_blank" rel="noopener">GitHub Profile</a> · <a href="https://www.linkedin.com/in/alexander-sorrell-it/" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://github.com/Alexander-Sorrell-IT/starreckon" target="_blank" rel="noopener">Starreckon Audit Card</a></p>
         </div>
     </footer>
 
