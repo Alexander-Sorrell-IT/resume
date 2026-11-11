@@ -24,9 +24,17 @@ jobs:
         run: python build.py
 
       - name: Deploy to Cloudflare Pages
+        if: env.CLOUDFLARE_API_TOKEN != ''
         run: |
           npx --yes wrangler@latest pages project create alexander-sorrell-resume --production-branch=main || true
           npx --yes wrangler@latest pages deploy _site --project-name=alexander-sorrell-resume --branch=main
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy to Cloudflare Worker
+        if: env.CLOUDFLARE_API_TOKEN != ''
+        run: npx --yes wrangler@latest deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
