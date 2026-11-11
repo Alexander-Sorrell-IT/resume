@@ -367,10 +367,10 @@ def build_all():
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>Alexander Sorrell — Resume</title>
     <meta name="description" content="Alexander Sorrell — AI Principal / Builder / Breaker — Verification &amp; Evaluation.">
-    <link rel="canonical" href="https://alexander-sorrell-it-resume.pages.dev/">
+    <link rel="canonical" href="https://alexander-sorrell-resume.pages.dev/">
     <meta property="og:title" content="Alexander Sorrell — Resume">
     <meta property="og:description" content="Models propose. A deterministic function owns the verdict. Every decision ships with a receipt a stranger can re-check.">
-    <meta property="og:url" content="https://alexander-sorrell-it-resume.pages.dev/">
+    <meta property="og:url" content="https://alexander-sorrell-resume.pages.dev/">
     <meta property="og:type" content="website">
     <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
     <link rel="stylesheet" href="/style.css">
@@ -385,7 +385,7 @@ def build_all():
                 <span>Alexander<strong>Sorrell</strong></span>
             </a>
             <div class="nav-domain-label">
-                <span>alexander-sorrell-it-resume.pages.dev</span>
+                <span>alexander-sorrell-resume.pages.dev</span>
             </div>
             <nav class="nav-links">
                 <a href="https://www.linkedin.com/in/alexander-sorrell-it/" target="_blank" rel="noopener">LinkedIn</a>
