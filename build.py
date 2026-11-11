@@ -255,11 +255,17 @@ def build_all():
         dest_docx = os.path.join(DOWNLOADS_DIR, cfg["docx_name"])
         shutil.copy2(src_docx, dest_docx)
         
-        # Convert to PDF
+        # Copy or convert to PDF
         pdf_dest = os.path.join(DOWNLOADS_DIR, cfg["pdf_name"])
-        if not os.path.exists(pdf_dest):
-            cmd = f'libreoffice --headless --convert-to pdf "{src_docx}" --outdir "{DOWNLOADS_DIR}"'
-            subprocess.run(cmd, shell=True, check=True)
+        root_pdf = os.path.join(ROOT, cfg["pdf_name"])
+        if os.path.exists(root_pdf):
+            shutil.copy2(root_pdf, pdf_dest)
+        elif not os.path.exists(pdf_dest):
+            if shutil.which("libreoffice"):
+                cmd = f'libreoffice --headless --convert-to pdf "{src_docx}" --outdir "{DOWNLOADS_DIR}"'
+                subprocess.run(cmd, shell=True, check=True)
+            else:
+                print(f"[warning] libreoffice not found; skipping PDF conversion for {src_docx}")
             
     # 2. Copy assets (CSS, CNAME, Headshot, QR Code, Logo)
     for f in ["style.css", "CNAME"]:
