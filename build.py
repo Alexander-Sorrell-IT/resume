@@ -23,7 +23,7 @@ RESUME_CONFIGS = [
         "id": "public",
         "title": "All Public Repos",
         "subtitle": "Consolidated Public Surface (Both Accounts)",
-        "badge": "38 Repos · 170k LOC · 3,342 Tests",
+        "badge": "39 Repos · 172k LOC · 3,368 Tests",
         "docx_src": "Alexander Sorrell Resume — Public.docx",
         "pdf_name": "Alexander Sorrell Resume — Public.pdf",
         "docx_name": "Alexander Sorrell Resume — Public.docx",
@@ -33,7 +33,7 @@ RESUME_CONFIGS = [
         "id": "alexander-sorrell-it",
         "title": "Alexander-Sorrell-IT",
         "subtitle": "Primary Architecture & Verification",
-        "badge": "33 Repos · 156k LOC · 3,168 Tests",
+        "badge": "34 Repos · 158k LOC · 3,194 Tests",
         "docx_src": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).docx",
         "pdf_name": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).pdf",
         "docx_name": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).docx",
@@ -197,7 +197,7 @@ def render_resume_body(skills, paras):
                 p_parts = first_line.split(" — ", 1)
                 html_out.append(f"<p class='proj-headline'><strong class='proj-name'>{html.escape(p_parts[0])}</strong> — <span class='proj-summary'>{linkify(p_parts[1])}</span></p>")
             else:
-                html_out.append(f"<p class='proj-headline'>{linkify(first_line)}</p>")
+                html_out.append(f"<p class='proj-headline'><strong class='proj-name'>{html.escape(first_line)}</strong></p>")
                 
             for sl in sublines[1:]:
                 if sl.startswith("Code:"):
