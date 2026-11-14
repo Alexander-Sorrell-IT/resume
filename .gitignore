@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 .env
 .wrangler/
+
+# Private all-repos reference dossier (covers 103 private repos) - never commit
+Alexander Sorrell Resume — All Repos.*
+resumes/Alexander_Sorrell_Resume_All_Repos.docx
