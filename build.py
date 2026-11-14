@@ -10,6 +10,8 @@ import shutil
 import re
 import html
 import subprocess
+import tempfile
+import zipfile
 import docx
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -17,6 +19,11 @@ RESUMES_DIR = os.path.join(ROOT, "resumes")
 SITE_DIR = os.path.join(ROOT, "_site")
 ASSETS_DIR = os.path.join(SITE_DIR, "assets")
 DOWNLOADS_DIR = os.path.join(SITE_DIR, "downloads")
+
+# Menlo is Apple-proprietary; DejaVu Sans Mono shares its Bitstream Vera
+# ancestry and keeps the aligned columns when rendering PDFs off-Mac.
+PDF_SOURCE_FONT = "Menlo"
+PDF_FALLBACK_FONT = "DejaVu Sans Mono"
 
 RESUME_CONFIGS = [
     {
@@ -241,6 +248,41 @@ def render_resume_body(skills, paras):
         
     return "\n".join(html_out)
 
+def convert_docx_to_pdf(src_docx, outdir):
+    """Convert a resume .docx to PDF with its monospace layout intact.
+
+    The resumes are set in Menlo, which is Apple-proprietary. Where it is
+    absent (CI, most Linux hosts) LibreOffice silently falls back to a
+    proportional sans, which destroys the aligned metric columns. Convert from
+    a temporary copy whose font is rewritten to DejaVu Sans Mono -- like Menlo,
+    a descendant of Bitstream Vera Sans Mono -- so the committed .docx keeps
+    Menlo for Word and Pages.
+    """
+    stem = os.path.splitext(os.path.basename(src_docx))[0]
+    with tempfile.TemporaryDirectory() as tmp:
+        staged = os.path.join(tmp, stem + ".docx")
+        with zipfile.ZipFile(src_docx) as zin, \
+                zipfile.ZipFile(staged, "w", zipfile.ZIP_DEFLATED) as zout:
+            for item in zin.infolist():
+                data = zin.read(item.filename)
+                if item.filename.endswith(".xml"):
+                    text = data.decode("utf-8")
+                    if PDF_SOURCE_FONT in text:
+                        data = text.replace(
+                            f'"{PDF_SOURCE_FONT}"', f'"{PDF_FALLBACK_FONT}"'
+                        ).encode("utf-8")
+                zout.writestr(item, data)
+
+        subprocess.run(
+            ["libreoffice", "--headless", "--convert-to", "pdf", staged, "--outdir", tmp],
+            check=True, capture_output=True,
+        )
+        produced = os.path.join(tmp, stem + ".pdf")
+        if not os.path.exists(produced):
+            raise RuntimeError(f"LibreOffice produced no PDF for {src_docx}")
+        shutil.move(produced, os.path.join(outdir, stem + ".pdf"))
+
+
 def build_all():
     os.makedirs(ASSETS_DIR, exist_ok=True)
     os.makedirs(DOWNLOADS_DIR, exist_ok=True)
@@ -262,8 +304,7 @@ def build_all():
             shutil.copy2(root_pdf, pdf_dest)
         elif not os.path.exists(pdf_dest):
             if shutil.which("libreoffice"):
-                cmd = f'libreoffice --headless --convert-to pdf "{src_docx}" --outdir "{DOWNLOADS_DIR}"'
-                subprocess.run(cmd, shell=True, check=True)
+                convert_docx_to_pdf(src_docx, DOWNLOADS_DIR)
             else:
                 print(f"[warning] libreoffice not found; skipping PDF conversion for {src_docx}")
             
