@@ -147,6 +147,18 @@ def sync_resumes_folder():
     print("[sync ] resumes/ copies")
 
 
+RESUME_FOLDER = os.path.normpath(os.path.join(ROOT, "..", "Alexander Sorrell Resumes"))
+
+
+def sync_resume_folder():
+    """Local folder holding all four resumes, DOCX and PDF. Never in git, never published."""
+    os.makedirs(RESUME_FOLDER, exist_ok=True)
+    for name in PUBLIC_RESUMES + [PRIVATE_RESUME]:
+        for ext in (".docx", ".pdf"):
+            shutil.copy2(os.path.join(ROOT, name + ext), os.path.join(RESUME_FOLDER, name + ext))
+    print(f"[sync ] {RESUME_FOLDER}")
+
+
 def sync_bastion():
     if not os.path.isdir(BASTION_DOWNLOADS):
         print(f"[warn ] no Bastion Fold checkout at {BASTION}; skipping")
@@ -217,6 +229,7 @@ def main():
         run(["npm", "run", "build"], BASTION)
 
     verify_published()
+    sync_resume_folder()
 
     if args.no_push:
         print("[done ] staged only (--no-push)")
