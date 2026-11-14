@@ -157,7 +157,9 @@ def sync_bastion():
                          os.path.join(BASTION_DOWNLOADS, name + ext))
         shutil.copy2(os.path.join(ROOT, name + ".docx"),
                      os.path.join(BASTION_DOWNLOADS, BASTION_ALIASES[name]))
-    print("[sync ] Bastion Fold downloads")
+    for qr in ("starreckon-qr.png", "matrixbuilderops-qr.png"):  # header QRs the nested page shows
+        shutil.copy2(os.path.join(ROOT, "assets", qr), os.path.join(BASTION, "src", "assets", qr))
+    print("[sync ] Bastion Fold downloads and header QRs")
     return True
 
 
