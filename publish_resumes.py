@@ -8,7 +8,8 @@ resume repository, rebuilds the static site, syncs the Bastion Fold copy, and
 refuses to publish anything that names an account outside OWNED_ACCOUNTS.
 
     python3 publish_resumes.py --from ~/Desktop/job-hunt/resumes/current
-    python3 publish_resumes.py --from <dir> --no-push     # stage only
+    python3 publish_resumes.py --telemetry <package-stats dir>   # refresh numbers only
+    python3 publish_resumes.py --from <dir> --telemetry <dir> --no-push
 """
 
 import argparse
@@ -23,6 +24,9 @@ import docx
 ROOT = os.path.dirname(os.path.abspath(__file__))
 BASTION = os.path.normpath(os.path.join(ROOT, "..", "bastion-fold"))
 BASTION_DOWNLOADS = os.path.join(BASTION, "src", "assets", "downloads")
+BASTION_RESUME = os.path.join(BASTION, "src", "resume.njk")
+NAV_MARKER = '<nav class="tabs-header-nav no-print">'
+BASTION_FOOTER_MARKER = '<div class="no-print" style="margin-top:36px'
 DOCS_DIR = os.path.join(ROOT, "docs")
 SITE_DIR = os.path.join(ROOT, "_site")
 
@@ -97,6 +101,37 @@ def stage(source_dir):
     return staged
 
 
+def refresh_telemetry(tool_dir):
+    """Live package numbers into all four resumes (the private one stays local), then PDFs."""
+    every = [os.path.join(ROOT, n + ".docx") for n in PUBLIC_RESUMES + [PRIVATE_RESUME]]
+    run([sys.executable, "refresh_telemetry.py", "--tool", tool_dir, *every], ROOT)
+    import build
+    for path in every:
+        build.convert_docx_to_pdf(path, ROOT)
+    print("[pdf  ] regenerated all four PDFs")
+
+
+def regenerate_nested_resume():
+    """Rebuild the Bastion Fold copy of the resume page from the fresh build.
+
+    The page is the Bastion header and back-links around the resume site's own
+    body and tab script, with paths pointed at the Bastion asset folder.
+    """
+    page = open(BASTION_RESUME, encoding="utf-8").read()
+    site = open(os.path.join(SITE_DIR, "index.html"), encoding="utf-8").read()
+    for text, marker in ((page, NAV_MARKER), (page, BASTION_FOOTER_MARKER), (site, NAV_MARKER)):
+        if text.count(marker) != 1:
+            raise SystemExit(f"expected one {marker!r} marker")
+    body = site[site.index(NAV_MARKER):site.index("</main>")].rstrip() + "\n"
+    body = body.replace('href="downloads/', 'href="/assets/downloads/').replace('src="assets/', 'src="/assets/')
+    script = site[site.rindex("<script>"):site.rindex("</script>") + len("</script>")]
+    prefix = page[:page.index(NAV_MARKER)]
+    footer = page[page.index(BASTION_FOOTER_MARKER):page.rindex("<script>")]
+    with open(BASTION_RESUME, "w", encoding="utf-8") as handle:
+        handle.write(prefix + body + "\n" + footer + script + "\n")
+    print("[sync ] Bastion Fold nested resume page regenerated")
+
+
 def sync_bastion():
     if not os.path.isdir(BASTION_DOWNLOADS):
         print(f"[warn ] no Bastion Fold checkout at {BASTION}; skipping")
@@ -135,17 +170,23 @@ def verify_published():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--from", dest="source", required=True,
+    parser.add_argument("--from", dest="source",
                         help="folder build_master_resume.py wrote the resumes to")
+    parser.add_argument("--telemetry", metavar="DIR",
+                        help="package-stats folder; refresh live package numbers before building")
     parser.add_argument("--no-push", action="store_true",
                         help="stage and build, but do not commit or push")
     args = parser.parse_args()
 
-    source_dir = os.path.expanduser(args.source)
-    if not os.path.isdir(source_dir):
-        raise SystemExit(f"no such folder: {source_dir}")
-
-    stage(source_dir)
+    if not args.source and not args.telemetry:
+        raise SystemExit("nothing to do: give --from, --telemetry, or both")
+    if args.source:
+        source_dir = os.path.expanduser(args.source)
+        if not os.path.isdir(source_dir):
+            raise SystemExit(f"no such folder: {source_dir}")
+        stage(source_dir)
+    if args.telemetry:
+        refresh_telemetry(os.path.expanduser(args.telemetry))
 
     run([sys.executable, "build.py"], ROOT)
     run(["rsync", "-a", "--delete", SITE_DIR + "/", DOCS_DIR + "/"], ROOT)
@@ -154,6 +195,7 @@ def main():
 
     have_bastion = sync_bastion()
     if have_bastion:
+        regenerate_nested_resume()
         run(["npm", "run", "build"], BASTION)
 
     verify_published()

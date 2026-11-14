@@ -30,7 +30,6 @@ RESUME_CONFIGS = [
         "id": "public",
         "title": "All Public Repos",
         "subtitle": "Consolidated Public Surface (Both Accounts)",
-        "badge": "39 Repos · 172k LOC · 3,368 Tests",
         "docx_src": "Alexander Sorrell Resume — Public.docx",
         "pdf_name": "Alexander Sorrell Resume — Public.pdf",
         "docx_name": "Alexander Sorrell Resume — Public.docx",
@@ -40,7 +39,6 @@ RESUME_CONFIGS = [
         "id": "alexander-sorrell-it",
         "title": "Alexander-Sorrell-IT",
         "subtitle": "Primary Architecture & Verification",
-        "badge": "34 Repos · 158k LOC · 3,194 Tests",
         "docx_src": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).docx",
         "pdf_name": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).pdf",
         "docx_name": "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT).docx",
@@ -50,7 +48,6 @@ RESUME_CONFIGS = [
         "id": "matrixbuilderops",
         "title": "matrixbuilderops",
         "subtitle": "Agent Fleets & Operational Machinery",
-        "badge": "5 Repos · 13.8k LOC · 174 Tests",
         "docx_src": "Alexander Sorrell Resume — Public (matrixbuilderops).docx",
         "pdf_name": "Alexander Sorrell Resume — Public (matrixbuilderops).pdf",
         "docx_name": "Alexander Sorrell Resume — Public (matrixbuilderops).docx",
@@ -248,6 +245,24 @@ def render_resume_body(skills, paras):
         
     return "\n".join(html_out)
 
+REPO_STATS = re.compile(r"([\d,]+) public repositories since [^:]+: ([\d,]+) lines, ([\d,]+) named tests")
+
+
+def derive_badge(src_docx):
+    """Tab badge from the resume's own 'Measured, not remembered' line.
+
+    The badge used to be typed by hand here and drifted from the generated
+    resume (39 vs 38 repos). Reading it from the .docx keeps one source.
+    """
+    for paragraph in docx.Document(src_docx).paragraphs:
+        m = REPO_STATS.search(paragraph.text)
+        if m:
+            repos, loc, tests = (int(g.replace(",", "")) for g in m.groups())
+            loc_k = f"{round(loc / 1000)}k" if loc >= 100_000 else f"{loc / 1000:.1f}k"
+            return f"{repos} Repos · {loc_k} LOC · {tests:,} Tests"
+    raise RuntimeError(f"no repository/lines/tests line found in {src_docx}")
+
+
 def convert_docx_to_pdf(src_docx, outdir):
     """Convert a resume .docx to PDF with its monospace layout intact.
 
@@ -333,6 +348,7 @@ def build_all():
     
     for cfg in RESUME_CONFIGS:
         src_docx = os.path.join(ROOT, cfg["docx_src"])
+        cfg["badge"] = derive_badge(src_docx)
         skills, paras = parse_docx_resume(src_docx)
         
         rendered_body = render_resume_body(skills, paras)
