@@ -132,6 +132,21 @@ def regenerate_nested_resume():
     print("[sync ] Bastion Fold nested resume page regenerated")
 
 
+RESUMES_ALIASES = {
+    "Alexander Sorrell Resume — Public": "Alexander_Sorrell_Resume_Public_All.docx",
+    "Alexander Sorrell Resume — Public (Alexander-Sorrell-IT)": "Alexander_Sorrell_Resume_Alexander_Sorrell_IT.docx",
+    "Alexander Sorrell Resume — Public (matrixbuilderops)": "Alexander_Sorrell_Resume_matrixbuilderops.docx",
+    PRIVATE_RESUME: "Alexander_Sorrell_Resume_All_Repos.docx",  # gitignored; local only
+}
+
+
+def sync_resumes_folder():
+    """Keep the resumes/ copies identical to the root resumes."""
+    for name, alias in RESUMES_ALIASES.items():
+        shutil.copy2(os.path.join(ROOT, name + ".docx"), os.path.join(ROOT, "resumes", alias))
+    print("[sync ] resumes/ copies")
+
+
 def sync_bastion():
     if not os.path.isdir(BASTION_DOWNLOADS):
         print(f"[warn ] no Bastion Fold checkout at {BASTION}; skipping")
@@ -188,6 +203,7 @@ def main():
     if args.telemetry:
         refresh_telemetry(os.path.expanduser(args.telemetry))
 
+    sync_resumes_folder()
     run([sys.executable, "build.py"], ROOT)
     run(["rsync", "-a", "--delete", SITE_DIR + "/", DOCS_DIR + "/"], ROOT)
     open(os.path.join(DOCS_DIR, ".nojekyll"), "a").close()
