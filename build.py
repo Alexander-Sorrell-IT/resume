@@ -245,8 +245,7 @@ def render_resume_body(skills, paras):
         
     return "\n".join(html_out)
 
-# Header QR per tab. The starreckon audit card belongs to Alexander-Sorrell-IT;
-# the matrixbuilderops tab gets its own QR so it shows only its own work.
+# Header QR: the Starreckon token-usage card, the same on every tab.
 STARRECKON_QR_HTML = """                <div class="header-right-col">
                     <a class="qr-link-box" href="https://alexander-sorrell-it.github.io/starreckon/#s=30.1&amp;g=MASTERWORK&amp;a=The_Systems_Architect&amp;v=7.0%2C6.6%2C6.1%2C5.1%2C5.3&amp;ss=14264&amp;h=1290&amp;d=75&amp;k=49&amp;tok=109.4B&amp;n=Alexander+Sorrell&amp;gh=Alexander-Sorrell-IT&amp;li=alexander-sorrell-it&amp;em=alexander.sorrell.it%40gmail.com&amp;web=github.com%2FAlexander-Sorrell-IT" target="_blank" rel="noopener" title="Scan or click to view verified Starreckon audit card">
                         <img class="resume-qr-img" src="assets/starreckon-qr.png" alt="Starreckon Proof of Work QR Code" width="115" height="115">
@@ -255,16 +254,6 @@ STARRECKON_QR_HTML = """                <div class="header-right-col">
                         <a href="https://github.com/Alexander-Sorrell-IT/starreckon" target="_blank" rel="noopener">github.com/Alexander-Sorrell-IT/starreckon</a><br>
                         <code>npx starreckon</code><br>
                         <strong class="audit-verdict">VERIFIED AUDIT · 30.1 MASTERWORK</strong>
-                    </div>
-                </div>
-"""
-
-MBO_QR_HTML = """                <div class="header-right-col">
-                    <a class="qr-link-box" href="https://github.com/matrixbuilderops" target="_blank" rel="noopener" title="Scan or click to open github.com/matrixbuilderops">
-                        <img class="resume-qr-img" src="assets/matrixbuilderops-qr.png" alt="QR code for github.com/matrixbuilderops" width="115" height="115">
-                    </a>
-                    <div class="qr-caption">
-                        <a href="https://github.com/matrixbuilderops" target="_blank" rel="noopener">github.com/matrixbuilderops</a>
                     </div>
                 </div>
 """
@@ -357,8 +346,7 @@ def build_all():
     if os.path.exists(headshot):
         shutil.copy2(headshot, os.path.join(ASSETS_DIR, "alexander-sorrell.jpg"))
         
-    for qr in ("starreckon-qr.png", "matrixbuilderops-qr.png"):
-        shutil.copy2(os.path.join(ROOT, "assets", qr), os.path.join(ASSETS_DIR, qr))
+    shutil.copy2(os.path.join(ROOT, "assets", "starreckon-qr.png"), os.path.join(ASSETS_DIR, "starreckon-qr.png"))
         
     fav = os.path.join(ROOT, "assets/favicon.svg")
     if os.path.exists(fav):
@@ -372,7 +360,7 @@ def build_all():
     for cfg in RESUME_CONFIGS:
         src_docx = os.path.join(ROOT, cfg["docx_src"])
         cfg["badge"] = derive_badge(src_docx)
-        qr_html = MBO_QR_HTML if cfg["id"] == "matrixbuilderops" else STARRECKON_QR_HTML
+        qr_html = STARRECKON_QR_HTML
         skills, paras = parse_docx_resume(src_docx)
         
         rendered_body = render_resume_body(skills, paras)

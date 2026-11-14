@@ -9,8 +9,9 @@ so the averages are the tool's own math, not a reimplementation.
 Scope comes from the filename: "(matrixbuilderops)" and "(Alexander-Sorrell-IT)"
 resumes carry only that account's packages; every other resume carries all.
 In a scoped resume the other account's packages, its starreckon QR section and
-its registry's verification commands are removed, the header QR is swapped for
-the account's own, and every count, total and date is recomputed for the scope.
+its registry's verification commands are removed, and every count, total and
+date is recomputed for the scope. The header QR (the Starreckon token-usage card)
+and its explainer section stay on every resume.
 
 Only run text is rewritten and only whole paragraphs are added or removed;
 run formatting is never touched. A figure that cannot be tied to a live number,
@@ -50,13 +51,12 @@ PACKAGE_ACCOUNT = {
 # starforge: former name of Alexander-Sorrell-IT/starreckon (GitHub redirects it).
 OTHER_NAMES = {"starforge": IT}
 QR_PACKAGE = "starreckon"
-# Header QR for a scope whose resume must not carry the starreckon audit card.
-SCOPE_QR = {MBO: ("github.com/matrixbuilderops",
-                  os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets", "matrixbuilderops-qr.png"))}
+# The header QR is the Starreckon token-usage card: a summary of the person,
+# on every resume. It and its explainer section are never scoped out.
+CARD_SECTION = ("QR CODE TARGET ENGINE", "PUBLIC INDEPENDENT VERIFICATION")
 REGISTRY_SCOPE = {"PyPI and npm": "PyPI & npm live registries", "PyPI": "PyPI live registry",
                   "npm": "npm live registry"}
 COUNT_WORDS = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six", 7: "seven"}
-
 ANSI = re.compile(r"\x1b\[[0-9;]*m")
 EMPTY_REGISTRY = re.compile(r"\u2502\s+0 pkgs \u2502")
 DOWNLOADS_AFTER_NAME = re.compile(r"^(\s*)([\d,]+)( downloads\b)")
@@ -343,14 +343,14 @@ def rewrite_verification(document, scope):
 
 
 def verify(document, path, scope):
-    cells = [c.text for t in document.tables for r in t.rows for c in r.cells]
-    text = "\n".join([p.text for p in document.paragraphs] + cells)
+    card = card_paragraphs(document)
+    cells = [c.text for t in document.tables for r in t.rows for c in r.cells
+             if not c._tc.xpath(".//pic:pic")]  # the header QR cell is the card
+    text = "\n".join([p.text for p in document.paragraphs if p._p not in card] + cells)
     for name in scope.excluded:
         if re.search(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", text):
             line = next(t for t in text.splitlines() if re.search(r"(?<![\w-])" + re.escape(name) + r"(?![\w-])", t))
             raise SystemExit(f"{path}: names {name}, which is not this resume's package: {line[:90]!r}")
-    if scope.account == MBO and QR_PACKAGE in text:
-        raise SystemExit(f"{path}: still mentions {QR_PACKAGE}")
     live = {fmt(p["downloads_lifetime"]) for p in scope.packages.values()}
     for paragraph in document.paragraphs:
         runs = paragraph.runs
@@ -369,13 +369,30 @@ def verify(document, path, scope):
                 raise SystemExit(f"{path}: says {n} packages, scope has {len(scope.packages)}: {t[:60]!r}")
 
 
+def card_paragraphs(document):
+    """Elements of the token-usage card's explainer section, exempt from scoping."""
+    keep, inside = set(), False
+    for paragraph in document.paragraphs:
+        text = paragraph.text.strip()
+        if text.startswith(CARD_SECTION[0]):
+            inside = True
+        elif text.startswith(CARD_SECTION[1]):
+            inside = False
+        if inside:
+            keep.add(paragraph._p)
+    return keep
+
+
 def drop_foreign_projects(document, scope):
     """In a scoped resume, drop project entries and bullets about only the other account's work.
 
     The PyPI / npm breakdown bullets are rewritten by rewrite_breakdown instead.
     """
     dropped = 0
+    card = card_paragraphs(document)
     for paragraph in document.paragraphs:
+        if paragraph._p in card:
+            continue
         text = paragraph.text
         bullet = text.startswith("\u2022 ") and not text.startswith(("\u2022 PyPI (", "\u2022 npm ("))
         if not (PROJECT.match(text) or bullet):
@@ -387,41 +404,9 @@ def drop_foreign_projects(document, scope):
     return dropped
 
 
-def rescope_header_qr(document, scope):
-    """Swap the header QR and its caption for the scope's own, when it has one."""
-    if scope.account not in SCOPE_QR:
-        return 0
-    caption, image = SCOPE_QR[scope.account]
-    qr_cells = [c for t in document.tables for r in t.rows for c in r.cells if c._tc.xpath(".//pic:pic")]
-    if any(caption in c.text and QR_PACKAGE not in c.text for c in qr_cells):
-        return 0  # swapped by a previous refresh
-    cells = [c for c in qr_cells if QR_PACKAGE in c.text]
-    if len(cells) != 1:
-        raise SystemExit(f"expected one header QR cell naming {QR_PACKAGE}, found {len(cells)}")
-    cell = cells[0]
-    blips = cell._tc.xpath(".//a:blip/@r:embed")
-    if len(blips) != 1:
-        raise SystemExit(f"expected one image in the header QR cell, found {len(blips)}")
-    with open(image, "rb") as handle:
-        document.part.related_parts[blips[0]]._blob = handle.read()
-    for paragraph in cell.paragraphs:
-        if QR_PACKAGE in paragraph.text:  # "github.com/.../starreckon" <br> "npx starreckon"
-            first, *rest = paragraph.runs
-            first.text = caption
-            for run in rest:
-                run._r.getparent().remove(run._r)
-        elif paragraph.text.strip() and not paragraph._p.xpath(".//pic:pic"):  # the audit score line
-            for run in paragraph.runs:
-                run.text = ""
-    return 1
-
-
 def refresh(path, scope):
     document = docx.Document(path)
     edits = drop_foreign_projects(document, scope) if scope.account else 0
-    if scope.account and QR_PACKAGE not in scope.packages:
-        remove_section(document, "QR CODE TARGET ENGINE", "PUBLIC INDEPENDENT VERIFICATION")
-    edits += rescope_header_qr(document, scope)
     edits += rewrite_breakdown(document, scope)
     edits += rewrite_appendix(document, scope)
     edits += rewrite_verification(document, scope)
